@@ -1,23 +1,76 @@
 #!/bin/bash
 
+# ---------------------------------------------------------------------------
+#
+# Simple script that takes an Ubuntu image and creates an install image 
+# suited for a MameBox, including:
+#  - customized plymouth splash screens
+#  - arcade joystick drivers
+#  - autologin to the "mamego" arcade frontend.
+#
+# Copyright (c) 2014 Andreas Signer <asigner@gmail.com>
+#
+# --------------------------------------------------------
+
+# TODO:
+# - Install joystick driver
+# - Install mame
+# - set up openssh server
+
+#
+# Figure out what directory we're in
+#
+BINARY=$(readlink -f $0)
+cd $(dirname ${BINARY})
+BINARY_DIR=$(pwd)
+
+USER=arcade
+PASSWORD=arcade
+
 #
 # Source image to use
 #
 SRC_IMAGE="/tmp/ubuntu-14.04.1-server-i386.iso"
 
+function log() {
+  echo "$@"
+}
+
 function usage() {
-	echo "Usage: $0 [horizontal|vertical]" >&2
+	echo "Usage: $0 [--orientation=horizontal|vertical] --hostname=<hostname> --frontend-pack=<path/to/frontendpack.tar.bz2>" >&2
 	exit 1
 }
 
 function parse_command_line() {
 	ORIENTATION=vertical
-	if [[ $# > 1 ]]; then
-		usage
-    elif [[ $# > 0 ]]; then
-    	ORIENTATION=$1
-    fi
+	FRONTEND_PACK=
+	HOSTNAME=nohost
+
+	for i in "$@"; do
+		case $i in
+    		--orientation=*)
+    			ORIENTATION="${i#*=}"
+    			shift
+    			;;
+    		--frontend-pack=*)
+    			FRONTEND_PACK="${i#*=}"
+    			shift
+    			;;
+    		--hostname=*)
+    			HOSTNAME="${i#*=}"
+    			shift
+    			;;
+		    *)
+				  usage
+			    ;;
+		esac
+	done
+
     if [[ "${ORIENTATION}" != "horizontal" && "${ORIENTATION}" != "vertical" ]]; then
+    	usage
+    fi
+
+    if [ -z "${FRONTEND_PACK}" ]; then
     	usage
     fi
 }
@@ -32,31 +85,91 @@ if [ "$EUID" -ne 0 ]
   exit
 fi
 
+log "Creating MameBox install image based on " ${SRC_IMAGE}
+
 #
 # Download the image if necessary
 #
 if [ ! -f ${SRC_IMAGE} ]; then
-	wget http://releases.ubuntu.com/14.04.1/ubuntu-14.04.1-server-i386.iso -O ${SRC_IMAGE}
+  URL=http://releases.ubuntu.com/14.04.1/ubuntu-14.04.1-server-i386.iso
+  log "Base image not available, downloading from ${URL}..."
+	wget -q ${URL} -O ${SRC_IMAGE}
 fi
+
+BASEDIR=$(mktemp -d)
+ISOSRC_DIR=${BASEDIR}/iso-original
+ISO_DIR=${BASEDIR}/iso-modified
+STAGING_DIR=${BASEDIR}/staging
+
+log "Base dir is ${BASEDIR}"
+
+# ------------------------------------------------------------------------
 
 #
 # Extract original iso
 #
-rm -rf /tmp/iso-original /tmp/iso-modified 2> /dev/null
-mkdir /tmp/iso-original
-mkdir /tmp/iso-modified
-mount -o loop ${SRC_IMAGE} /tmp/iso-original
-cp -rT /tmp/iso-original/ /tmp/iso-modified/
-umount /tmp/iso-original
-rm -rf /tmp/iso-original
+log "Extracting base image..."
+mkdir -p ${ISOSRC_DIR}
+mkdir -p ${ISO_DIR}
+mount -o loop ${SRC_IMAGE} ${ISOSRC_DIR}
+cp -rT ${ISOSRC_DIR} ${ISO_DIR}
+umount ${ISOSRC_DIR}
+rm -rf ${ISOSRC_DIR}
+
+# ------------------------------------------------------------------------
+
+#
+# Set up a staging dir containing all the additional stuff we need.
+#
+log "Setting up staging directory..."
+mkdir -p ${STAGING_DIR}
+# Plymouth
+mkdir -p ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo
+cp ${BINARY_DIR}/resources/plymouth/mamebox-logo/* ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo
+if [[ "${ORIENTATION}" == "horizontal" ]]; then
+	mv ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-horizontal.png ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo.png
+	rm ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-vertical.png
+else
+	rm ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-horizontal.png
+	mv ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-vertical.png ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo.png
+fi
+# Desktop Session
+mkdir -p ${STAGING_DIR}/usr/share/xsessions
+cat <<EOF > ${STAGING_DIR}/usr/share/xsessions/arcade.desktop
+[Desktop Entry]
+Name=Arcade
+Exec=/home/${USER}/mamego/run.sh
+Icon=
+Type=Application
+EOF
+
+mkdir -p ${STAGING_DIR}/home/${USER}
+cat <<EOF > ${STAGING_DIR}/home/${USER}/.dmrc
+[Desktop]
+Session=arcade
+EOF
+
+mkdir -p ${STAGING_DIR}/etc/lightdm/
+cat <<EOF > ${STAGING_DIR}/etc/lightdm/lightdm.conf
+[SeatDefaults]
+autologin-user=${USER}
+autologin-session=lightdm-autologin # This seems to be important, but I couldn't find documentation...
+user-session=arcade
+EOF
+
+# ------------------------------------------------------------------------
 
 #
 # Modify image to our liking
 #
-cd /tmp/iso-modified
+log "Setting up install scripts..."
+cd ${ISO_DIR}
 
-# Prevent the language selection menu from appearing
-echo en > isolinux/lang 
+mkdir -p mamebox
+tar cfj mamebox/data.tar.bz2 -C ${STAGING_DIR} .
+cp ${BINARY_DIR}/${FRONTEND_PACK} mamebox/frontend.tar.bz2
+
+echo en > isolinux/lang  # Prevent the language selection menu from appearing
 
 #
 # Set up a kickstart config.
@@ -84,7 +197,7 @@ timezone Europe/Zurich
 rootpw --disabled
 
 # Initial user (will have sudo so no need for root)
-user arcade --fullname "Arcade Box" --password arcade
+user ${USER} --fullname "Arcade Box" --password ${PASSWORD}
 
 # Reboot after installation
 reboot
@@ -129,7 +242,7 @@ preseed base-installer/install-recommends boolean false
 auth  --useshadow  --enablemd5
 
 # Network information
-network --bootproto=dhcp --device=eth0
+network --bootproto=dhcp --device=eth0 --hostname ${HOSTNAME}
 
 # Firewall configuration
 firewall --disabled --trust=eth0 --ssh
@@ -144,13 +257,28 @@ xconfig --depth=32 --resolution=800x600 --defaultdesktop=GNOME --startxonboot
 
 # Additional packages to install
 %packages
-openssh-server
+@core
 ubuntu-desktop
+libsdl-image1.2
+libsdl-mixer1.2
+libsdl-ttf2.0
+openssh-server
 
 %post
-#
-# TODO: Install mamego
-#
+# copy additional config and frontend
+cd /
+tar xfj /media/cdrom/mamebox/data.tar.bz2
+mkdir -p /home/${USER}/mamego
+tar xfj /media/cdrom/mamebox/frontend.tar.bz2 -C /home/${USER}/mamego
+
+# make our plymouth theme default
+cd /lib/plymouth/themes
+rm default.grub default.plymouth 
+ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.plymouth default.plymouth
+ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.grub default.grub
+
+# Make sure arcade's files belong to himself
+chown -R ${USER}:${USER} /home/${USER}
 
 # Clean up
 apt-get -qq -y autoremove
@@ -184,7 +312,6 @@ d-i apt-setup/universe boolean true
 #d-i apt-setup/services-select multiselect security
 #d-i apt-setup/security_host string security.ubuntu.com
 #d-i apt-setup/security_path string /ubuntu
-
 EOF
 
 #
@@ -203,16 +330,21 @@ label install
   append  file=/cdrom/preseed/ubuntu-server.seed initrd=/install/initrd.gz ks=cdrom:/ks.cfg preseed/file=/cdrom/ks.preseed --
 EOF
 
+# ------------------------------------------------------------------------
+
 #
 # Create new image from modified files
 #
-
+log "Creating install image..."
+TARGET_ISO=/tmp/${HOSTNAME}-arcade-ubuntu-14-04-i386.iso
 cd ..
-mkisofs -D -r -V "ARCADE_UBUNTU" -cache-inodes -J -l \
+mkisofs -quiet -D -r -V "ARCADE_UBUNTU" -cache-inodes -J -l \
   -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table \
-  -o arcade-ubuntu-14-04-i386.iso /tmp/iso-modified
+  -o ${TARGET_ISO} ${ISO_DIR}
+
+log "MameBox image created at: ${TARGET_ISO}"
 
 #
 # Cleanup
 #
-rm -rf /tmp/iso-modified
+rm -rf ${BASEDIR}
