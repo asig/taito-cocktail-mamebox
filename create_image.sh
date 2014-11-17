@@ -37,7 +37,7 @@ function log() {
 }
 
 function usage() {
-	echo "Usage: $0 [--orientation=horizontal|vertical] --hostname=<hostname> --frontend-pack=<path/to/frontendpack.tar.bz2>" >&2
+	echo "Usage: $0 [--orientation=horizontal|vertical] [--ssid=<ssid> --ssid_password=<password>] --hostname=<hostname> --frontend-pack=<path/to/frontendpack.tar.bz2> " >&2
 	exit 1
 }
 
@@ -45,24 +45,34 @@ function parse_command_line() {
 	ORIENTATION=vertical
 	FRONTEND_PACK=
 	HOSTNAME=nohost
+  SSID=
+  SSID_PASSWORD=
 
 	for i in "$@"; do
 		case $i in
-    		--orientation=*)
-    			ORIENTATION="${i#*=}"
-    			shift
-    			;;
-    		--frontend-pack=*)
-    			FRONTEND_PACK="${i#*=}"
-    			shift
-    			;;
-    		--hostname=*)
-    			HOSTNAME="${i#*=}"
-    			shift
-    			;;
-		    *)
-				  usage
-			    ;;
+      --orientation=*)
+        ORIENTATION="${i#*=}"
+        shift
+        ;;
+      --frontend-pack=*)
+        FRONTEND_PACK="${i#*=}"
+        shift
+        ;;
+      --hostname=*)
+        HOSTNAME="${i#*=}"
+        shift
+        ;;
+      --ssid=*)
+        SSID="${i#*=}"
+        shift
+        ;;
+      --ssid_password=*)
+        SSID_PASSWORD="${i#*=}"
+        shift
+        ;;
+      *)
+        usage
+        ;;
 		esac
 	done
 
@@ -276,6 +286,16 @@ cd /lib/plymouth/themes
 rm default.grub default.plymouth 
 ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.plymouth default.plymouth
 ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.grub default.grub
+
+# Setup wlan0 if there is owner
+if [ ! -z "${SSID}"]; then
+  cat <<EOF2 >> /etc/network/interfaces
+auto wlan0
+iface wlan0 inet dhcp
+    wpa-ssid ${SSID}
+    wpa-psk ${SSID_PASSWORD}
+EOF2
+fi
 
 # Make sure arcade's files belong to himself
 chown -R ${USER}:${USER} /home/${USER}
