@@ -13,7 +13,7 @@
 # --------------------------------------------------------
 
 # TODO:
-# - Install joystick driver
+# - Install joystick driver (flag protected)
 # - Install mame
 # - set up openssh server
 
@@ -37,7 +37,7 @@ function log() {
 }
 
 function usage() {
-	echo "Usage: $0 [--orientation=horizontal|vertical] [--ssid=<ssid> --ssid_password=<password>] --hostname=<hostname> --frontend-pack=<path/to/frontendpack.tar.bz2> " >&2
+	echo "Usage: $0 [--orientation=horizontal|vertical] [--wlan_ssid=<ssid> --wlan_password=<password>] [--hostname=<hostname>] [--mame=<path/to/mame>] --frontend-pack=<path/to/frontendpack.tar.bz2>" >&2
 	exit 1
 }
 
@@ -45,8 +45,9 @@ function parse_command_line() {
 	ORIENTATION=vertical
 	FRONTEND_PACK=
 	HOSTNAME=nohost
-  SSID=
-  SSID_PASSWORD=
+  WLAN_SSID=
+  WLAN_PASSWORD=
+  MAME=
 
 	for i in "$@"; do
 		case $i in
@@ -62,12 +63,16 @@ function parse_command_line() {
         HOSTNAME="${i#*=}"
         shift
         ;;
-      --ssid=*)
-        SSID="${i#*=}"
+      --wlan_ssid=*)
+        WLAN_SSID="${i#*=}"
         shift
         ;;
-      --ssid_password=*)
-        SSID_PASSWORD="${i#*=}"
+      --wlan_password=*)
+        wlan_PASSWORD="${i#*=}"
+        shift
+        ;;
+      --mame=*)
+        MAME="${i#*=}"
         shift
         ;;
       *)
@@ -83,6 +88,18 @@ function parse_command_line() {
     if [ -z "${FRONTEND_PACK}" ]; then
     	usage
     fi
+    if [ ! -f ${FRONTEND_PACK} ]; then
+      log "${FRONTEND_PACK} is not a valid file"
+      usage
+    fi
+
+    if [ ! -z "${MAME}" ]; then
+      if [ ! -f ${MAME} ]; then
+        log "${MAME} is not a valid file"
+        usage
+      fi
+    fi
+
 }
 
 
@@ -178,6 +195,9 @@ cd ${ISO_DIR}
 mkdir -p mamebox
 tar cfj mamebox/data.tar.bz2 -C ${STAGING_DIR} .
 cp ${BINARY_DIR}/${FRONTEND_PACK} mamebox/frontend.tar.bz2
+if [ ! -z "${MAME}" ]; then
+  cp ${MAME} mamebox/
+fi
 
 echo en > isolinux/lang  # Prevent the language selection menu from appearing
 
@@ -185,8 +205,6 @@ echo en > isolinux/lang  # Prevent the language selection menu from appearing
 # Set up a kickstart config.
 #
 cat <<EOF > ks.cfg
-# Load our own preseed
-preseed preseed/file=/cdrom/ks.seed
 
 # System language
 lang en_US
@@ -209,8 +227,12 @@ rootpw --disabled
 # Initial user (will have sudo so no need for root)
 user ${USER} --fullname "Arcade Box" --password ${PASSWORD}
 
+# The installer will warn about weak passwords. If you are sure you know
+# what you're doing and want to override it, uncomment this.
+preseed user-setup/allow-password-weak boolean true
+
 # Reboot after installation
-reboot
+#reboot
 
 # Use text mode install
 text
@@ -239,10 +261,17 @@ zerombr yes
 # Partition clearing information
 clearpart --all --initlabel
 
-#Disk partitioning information
-part / --fstype ext4 --size 8192 --asprimary 
+# Disk partitioning information
+# This assumes at least a 30G disk and will fail
+# if the disk is too small.
+part / --fstype ext4 --size 4096 --asprimary 
 part /mame-data --fstype ext4 --size 20480 --asprimary 
 part swap --size 3192 --grow --maxsize 4096 --asprimary 
+
+# Additional partman config
+preseed partman/confirm_write_new_label boolean true 
+preseed partman/choose_partition  select Finish partitioning and write changes to disk 
+preseed partman/confirm boolean true
 
 # Don't install recommended items by default
 preseed base-installer/install-recommends boolean false
@@ -265,14 +294,33 @@ preseed pkgsel/update-policy select none
 #X Window System configuration information
 xconfig --depth=32 --resolution=800x600 --defaultdesktop=GNOME --startxonboot
 
+### Apt setup
+# You can choose to install restricted and universe software, or to install
+# software from the backports repository.
+preseed apt-setup/restricted boolean true
+preseed apt-setup/universe boolean true
+#preseed apt-setup/backports boolean true
+# Uncomment this if you don't want to use a network mirror.
+#preseed apt-setup/use_mirror boolean false
+# Select which update services to use; define the mirrors to be used.
+# Values shown below are the normal defaults.
+#preseed apt-setup/services-select multiselect security
+#preseed apt-setup/security_host string security.ubuntu.com
+#preseed apt-setup/security_path string /ubuntu
+
+
 # Additional packages to install
 %packages
 @core
 ubuntu-desktop
+openssh-server
+# for mame <= 0.152
 libsdl-image1.2
 libsdl-mixer1.2
 libsdl-ttf2.0
-openssh-server
+# for newer mame
+libsdl2-2.0.0
+libsdl2-ttf-2.0.0
 
 %post
 # copy additional config and frontend
@@ -280,6 +328,9 @@ cd /
 tar xfj /media/cdrom/mamebox/data.tar.bz2
 mkdir -p /home/${USER}/mamego
 tar xfj /media/cdrom/mamebox/frontend.tar.bz2 -C /home/${USER}/mamego
+if [ -f /media/cdrom/mamebox/mame ]; then
+  cp /media/cdrom/mamebox/mame /home/${USER}/mamego/
+fi
 
 # make our plymouth theme default
 cd /lib/plymouth/themes
@@ -288,12 +339,12 @@ ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.plymouth default.plymouth
 ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.grub default.grub
 
 # Setup wlan0 if there is owner
-if [ ! -z "${SSID}"]; then
+if [ ! -z "${WLAN_SSID}"]; then
   cat <<EOF2 >> /etc/network/interfaces
 auto wlan0
 iface wlan0 inet dhcp
-    wpa-ssid ${SSID}
-    wpa-psk ${SSID_PASSWORD}
+    wpa-ssid ${WLAN_SSID}
+    wpa-psk ${WLAN_PASSWORD}
 EOF2
 fi
 
@@ -305,33 +356,6 @@ apt-get -qq -y autoremove
 apt-get clean
 rm -f /var/cache/apt/*cache.bin
 rm -f /var/lib/apt/lists/*
-EOF
-
-#
-# Add a preseed file, to suppress other questions
-#
-cat <<EOF > ks.preseed
-d-i partman/confirm_write_new_label boolean true 
-d-i partman/choose_partition  select Finish partitioning and write changes to disk 
-d-i partman/confirm boolean true
-
-# The installer will warn about weak passwords. If you are sure you know
-# what you're doing and want to override it, uncomment this.
-d-i user-setup/allow-password-weak boolean true
-
-### Apt setup
-# You can choose to install restricted and universe software, or to install
-# software from the backports repository.
-d-i apt-setup/restricted boolean true
-d-i apt-setup/universe boolean true
-#d-i apt-setup/backports boolean true
-# Uncomment this if you don't want to use a network mirror.
-#d-i apt-setup/use_mirror boolean false
-# Select which update services to use; define the mirrors to be used.
-# Values shown below are the normal defaults.
-#d-i apt-setup/services-select multiselect security
-#d-i apt-setup/security_host string security.ubuntu.com
-#d-i apt-setup/security_path string /ubuntu
 EOF
 
 #
@@ -347,7 +371,7 @@ default install
 label install
   menu label ^Install Ubuntu Server
   kernel /install/vmlinuz
-  append  file=/cdrom/preseed/ubuntu-server.seed initrd=/install/initrd.gz ks=cdrom:/ks.cfg preseed/file=/cdrom/ks.preseed --
+  append  file=/cdrom/preseed/ubuntu-server.seed initrd=/install/initrd.gz ks=cdrom:/ks.cfg --
 EOF
 
 # ------------------------------------------------------------------------
