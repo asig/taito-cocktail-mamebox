@@ -272,6 +272,9 @@ part swap --size 3192 --grow --maxsize 4096 --asprimary
 preseed partman/confirm_write_new_label boolean true 
 preseed partman/choose_partition  select Finish partitioning and write changes to disk 
 preseed partman/confirm boolean true
+# Prevent partman from asking whether mounted partitions should be unmounted. See also
+# http://matelakat.blogspot.ch/2014/05/ubuntu-installer-unmount-partitions.html
+preseed preseed/early_command string umount /media || true 
 
 # Don't install recommended items by default
 preseed base-installer/install-recommends boolean false
