@@ -14,8 +14,6 @@
 
 # TODO:
 # - Install joystick driver (flag protected)
-# - Install mame
-# - set up openssh server
 
 #
 # Figure out what directory we're in
@@ -176,12 +174,23 @@ cat <<EOF > ${STAGING_DIR}/home/${USER}/.dmrc
 Session=arcade
 EOF
 
+cat <<EOF > ${STAGING_DIR}/home/${USER}/VERSION
+Install image based on $(basename ${SRC_IMAGE}), created on $(date)
+EOF
+
 mkdir -p ${STAGING_DIR}/etc/lightdm/
 cat <<EOF > ${STAGING_DIR}/etc/lightdm/lightdm.conf
 [SeatDefaults]
 autologin-user=${USER}
 autologin-session=lightdm-autologin # This seems to be important, but I couldn't find documentation...
 user-session=arcade
+EOF
+
+
+# blacklist mei_me, just in we're running on the Optiplex 755 cocktail table.
+# See also https://bbs.archlinux.org/viewtopic.php?id=168403
+cat <<EOF > ${STAGING_DIR}/etc/modprobe.d/blacklist-mei.conf
+blacklist mei_me
 EOF
 
 # ------------------------------------------------------------------------
@@ -342,7 +351,7 @@ ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.plymouth default.plymouth
 ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.grub default.grub
 
 # Setup wlan0 if there is owner
-if [ ! -z "${WLAN_SSID}"]; then
+if [ ! -z "${WLAN_SSID}" ]; then
   cat <<EOF2 >> /etc/network/interfaces
 auto wlan0
 iface wlan0 inet dhcp
