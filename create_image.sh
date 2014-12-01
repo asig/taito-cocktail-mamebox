@@ -40,15 +40,15 @@ function usage() {
 }
 
 function parse_command_line() {
-	ORIENTATION=vertical
-	FRONTEND_PACK=
-	HOSTNAME=nohost
+  ORIENTATION=vertical
+  FRONTEND_PACK=
+  HOSTNAME=nohost
   WLAN_SSID=
   WLAN_PASSWORD=
   MAME=
 
-	for i in "$@"; do
-		case $i in
+  for i in "$@"; do
+    case $i in
       --orientation=*)
         ORIENTATION="${i#*=}"
         shift
