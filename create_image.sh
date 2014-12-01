@@ -158,7 +158,8 @@ else
 	rm ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-horizontal.png
 	mv ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-vertical.png ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo.png
 fi
-# Desktop Session
+
+# Creating mamego Desktop Session
 mkdir -p ${STAGING_DIR}/usr/share/xsessions
 cat <<EOF > ${STAGING_DIR}/usr/share/xsessions/arcade.desktop
 [Desktop Entry]
@@ -168,16 +169,7 @@ Icon=
 Type=Application
 EOF
 
-mkdir -p ${STAGING_DIR}/home/${USER}
-cat <<EOF > ${STAGING_DIR}/home/${USER}/.dmrc
-[Desktop]
-Session=arcade
-EOF
-
-cat <<EOF > ${STAGING_DIR}/home/${USER}/VERSION
-Install image based on $(basename ${SRC_IMAGE}), created on $(date)
-EOF
-
+# Configuring auto login
 mkdir -p ${STAGING_DIR}/etc/lightdm/
 cat <<EOF > ${STAGING_DIR}/etc/lightdm/lightdm.conf
 [SeatDefaults]
@@ -186,12 +178,45 @@ autologin-session=lightdm-autologin # This seems to be important, but I couldn't
 user-session=arcade
 EOF
 
+# VERSION file 
+mkdir -p ${STAGING_DIR}/home/${USER}
+cat <<EOF > ${STAGING_DIR}/home/${USER}/VERSION
+MameBox Ubuntu, based on $(basename ${SRC_IMAGE}).
+Install image created on $(date).
+EOF
 
 # blacklist mei_me, just in we're running on the Optiplex 755 cocktail table.
 # See also https://bbs.archlinux.org/viewtopic.php?id=168403
+mkdir -p ${STAGING_DIR}/etc/modprobe.d/
 cat <<EOF > ${STAGING_DIR}/etc/modprobe.d/blacklist-mei.conf
 blacklist mei_me
 EOF
+
+# Configure GRUB to not wait for OS selection, and add the "quiet" and "splash" command line args
+mkdir -p ${STAGING_DIR}/etc/default
+cat <<EOF > ${STAGING_DIR}/etc/default/grub
+GRUB_DEFAULT=0
+GRUB_HIDDEN_TIMEOUT=0
+GRUB_HIDDEN_TIMEOUT_QUIET=true
+GRUB_TIMEOUT=0
+GRUB_DISTRIBUTOR=`lsb_release -i -s 2> /dev/null || echo Debian`
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX=""
+EOF
+
+# User settings
+# Choosing default session. Really necessary?
+mkdir -p ${STAGING_DIR}/home/${USER}
+cat <<EOF > ${STAGING_DIR}/home/${USER}/.dmrc
+[Desktop]
+Session=arcade
+EOF
+# Create arcade's authorized_keys
+mkdir -p ${STAGING_DIR}/home/${USER}/.ssh
+cat <<EOF > ${STAGING_DIR}/home/${USER}/.ssh/authorized_keys
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAEAQDa1broGfjiZBAOU3pFsyEbCn1//S5axUc8a0veQPX38CglqNn2PZrYg4/f/ub3EHgc0Vdi8kb4mxJEpfhBtzYsckzqK0PMAwkYZVrFVpu3JpETGcCJT5rIU9eiwDgs1zrb6C1lk1xSrtW1lfdlIiz9jeZ7gj0DiaFX+rvNNB7NB0s+PapUWN4xTP5FQI2lm4nA3tI8D2M6FETlEtnwJatzG4eqEyIojaaEo AFFOOZ4ydN4w75bXcximxZZ4P1F0o4tQhiba9xLb021JgLxZ6E4ZIP3SGuZ7FlKGB6koN8IJThV/O8q07q4Gg1ueA/pCEO3DPynclFsVs0hM6rZQ/s29mhD8wv0+kpP744LkIoZGech1pYq2x2CNZp51f95HRA3HtIIDSdADHQ9q8DCFZXgg7x318PW3eHBtrzxCKXlJApYPvrGwgHQKgOx1Qg1MWV25mx0/JoeEtGfvKDWnDGo2afc3VoeXxpZ5lJIR61/fO xxptOUzxe8Vqr1gDQfbUqWo+OvT1Rocr27/HZ1Lk4C5UjgFYVl2Qb2Kk8CxUFwmCNkPn4qhMNWA3OL2tH5vJAx+mFxfCEfeyFLtas74jCEa+B03Zt/Ar65tCrnTiEWEuokpj4uGYNU+5MfnWiPV8oYdYvUd74Hl0UJvV1yXRohXqehR1znbwTe7p9H0JrRj0ws8le2sXSBHuNoUIlYltO8/F4G0GObnwt7n6kmvMWAsTRERae2Z19xpUNoIksOMkWXAV2twHv 6C2CtLhkkpX/tmRAeHrUjoA5QYE9G0vJx8/3+zs4LTBN+JNyANucrlFpsPnRC55KGaJvsbpnCJ9oly0YRaF7/nDR4924MEFwfjo5AHY+pO+xoZguw/Vo7fK1cRJdup7tufwutrvT4oJIKLDxjH9Wuceg5UYkL2VrfnbGAklxQIwGLudMDUovi1fHBRb4Y46hBaEk43N/qqZrvtQWJpyXorz3LtYErXaPqquvS3+Ml+mRV9etIdXY4U6F9C6dq43o57GJU5wAN FLg05eVSP/qrQsI6tXm95hAOlpwAc5jW77CF5cVWLA3jklQIROZ5D/NyZnTOwte99qBQ0tCTK9JapSzwia/S85kitX7JlCv7XvntxZ6G81mZatg/cQjS09N3+5hTmLIKC3IFnZBtUgTPPZyk+td/esU3rA5H7GD0nznkVFU8PcjsozEvjlJjair9yzDvVdFPKVFEqiOd9nVqCkpQxuozyQXxp3Rjz3feTMyuvEZCbBjgZkovaL6Oj2GV4zF3X7Ob3pXX+nV5W Xy7lf+Pn2GD17dw3hV2by4+pNIFWLTgfsHobveKYBjPSokK9HIOb98Y8oukeONpoDcrVSHWpgD9tzMN asigner@bilbo
+EOF
+
 
 # ------------------------------------------------------------------------
 
@@ -343,6 +368,9 @@ tar xfj /media/cdrom/mamebox/frontend.tar.bz2 -C /home/${USER}/mamego
 if [ -f /media/cdrom/mamebox/mame ]; then
   cp /media/cdrom/mamebox/mame /home/${USER}/mamego/
 fi
+
+# Update grub because we (might have) messed with its config
+/usr/sbin/update-grub
 
 # make our plymouth theme default
 cd /lib/plymouth/themes
