@@ -225,21 +225,20 @@ EOF
 # Modify image to our liking
 #
 log "Setting up install scripts..."
-cd ${ISO_DIR}
 
-mkdir -p mamebox
-tar cfj mamebox/data.tar.bz2 -C ${STAGING_DIR} .
-cp ${BINARY_DIR}/${FRONTEND_PACK} mamebox/frontend.tar.bz2
+mkdir -p ${ISO_DIR}/mamebox
+tar cfj ${ISO_DIR}/mamebox/data.tar.bz2 -C ${STAGING_DIR} .
+cp ${BINARY_DIR}/${FRONTEND_PACK} ${ISO_DIR}/mamebox/frontend.tar.bz2
 if [ ! -z "${MAME}" ]; then
-  cp ${MAME} mamebox/
+  cp ${MAME} ${ISO_DIR}/mamebox/
 fi
 
-echo en > isolinux/lang  # Prevent the language selection menu from appearing
+echo en > ${ISO_DIR}/isolinux/lang  # Prevent the language selection menu from appearing
 
 #
 # Set up a kickstart config.
 #
-cat <<EOF > ks.cfg
+cat <<EOF > ${ISO_DIR}/ks.cfg
 
 # System language
 lang en_US
@@ -402,12 +401,12 @@ EOF
 #
 # Don't wait (or more correct, wait 1/10th of a second) for the user to select "Install server"
 #
-sed -i 's/^timeout 0$/timeout 1/g' isolinux/isolinux.cfg
+sed -i 's/^timeout 0$/timeout 1/g' ${ISO_DIR}/isolinux/isolinux.cfg
 
 #
 # Finally, overwrite the install menu
 #
-cat <<EOF > isolinux/txt.cfg
+cat <<EOF > ${ISO_DIR}/isolinux/txt.cfg
 default install
 label install
   menu label ^Install Ubuntu Server
@@ -422,10 +421,11 @@ EOF
 #
 log "Creating install image..."
 TARGET_ISO=/tmp/${HOSTNAME}-arcade-ubuntu-14-04-i386.iso
-cd ..
+pushd ${ISO_DIR}/..
 mkisofs -quiet -D -r -V "ARCADE_UBUNTU" -cache-inodes -J -l \
   -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table \
   -o ${TARGET_ISO} ${ISO_DIR}
+popd
 
 log "MameBox image created at: ${TARGET_ISO}"
 
