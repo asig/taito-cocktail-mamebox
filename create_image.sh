@@ -107,7 +107,7 @@ function parse_command_line() {
 parse_command_line $@
 if [ "$EUID" -ne 0 ]
   then echo "Please run as root"
-  exit
+  exit 1
 fi
 
 log "Creating MameBox install image based on " ${SRC_IMAGE}
