@@ -378,10 +378,20 @@ rm default.grub default.plymouth
 ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.plymouth default.plymouth
 ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.grub default.grub
 
-# Setup wlan0 if there is owner
+# Overwrite existing network config to make sure eth0 is allow-hotplug
+cat <<EOF2 > /etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+allow-hotplug eth0
+iface eth0 inet dhcp
+EOF2
+
+# Setup wlan0 if there is one
 if [ ! -z "${WLAN_SSID}" ]; then
   cat <<EOF2 >> /etc/network/interfaces
-auto wlan0
+
+allow-hotplug wlan0
 iface wlan0 inet dhcp
     wpa-ssid ${WLAN_SSID}
     wpa-psk ${WLAN_PASSWORD}
