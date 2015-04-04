@@ -116,7 +116,7 @@ log "Creating MameBox install image based on " ${SRC_IMAGE}
 # Download the image if necessary
 #
 if [ ! -f ${SRC_IMAGE} ]; then
-  URL=http://releases.ubuntu.com/14.04.1/ubuntu-14.04.1-server-i386.iso
+  URL=http://old-releases.ubuntu.com/releases/14.04.1/ubuntu-14.04.1-server-i386.iso
   log "Base image not available, downloading from ${URL}..."
 	wget -q ${URL} -O ${SRC_IMAGE}
 fi
