@@ -66,7 +66,7 @@ function parse_command_line() {
         shift
         ;;
       --wlan_password=*)
-        wlan_PASSWORD="${i#*=}"
+        WLAN_PASSWORD="${i#*=}"
         shift
         ;;
       --mame=*)
