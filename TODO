@@ -1,0 +1,4 @@
+Bugs
+----
+( ) /etc/network/interfaces gets overwritten.
+    maybe related to https://bugs.launchpad.net/ubuntu/+source/netcfg/+bug/1361902 ?
