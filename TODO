@@ -1,4 +1,4 @@
 Bugs
 ----
-( ) /etc/network/interfaces gets overwritten.
-    maybe related to https://bugs.launchpad.net/ubuntu/+source/netcfg/+bug/1361902 ?
+( ) /etc/network/interfaces gets overwritten before reboot due to this bug:
+    https://bugs.launchpad.net/ubuntu/+source/netcfg/+bug/1361902
