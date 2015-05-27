@@ -8,7 +8,7 @@
 #  - arcade joystick drivers
 #  - autologin to the "mamego" arcade frontend.
 #
-# Copyright (c) 2014 Andreas Signer <asigner@gmail.com>
+# Copyright (c) 2015 Andreas Signer <asigner@gmail.com>
 #
 # --------------------------------------------------------
 
@@ -379,7 +379,9 @@ ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.plymouth default.plymouth
 ln -s /lib/plymouth/themes/mamebox-logo/mamebox-logo.grub default.grub
 
 # Overwrite existing network config to make sure eth0 is allow-hotplug
-cat <<EOF2 > /etc/network/interfaces
+# Write it to a separate file (due to https://bugs.launchpad.net/ubuntu/+source/netcfg/+bug/1361902)
+# and copy it to /etc/network/interfaces during first startup
+cat <<EOF2 > /etc/network/interfaces.TO_BE_INSTALLED
 auto lo
 iface lo inet loopback
 
@@ -389,7 +391,7 @@ EOF2
 
 # Setup wlan0 if there is one
 if [ ! -z "${WLAN_SSID}" ]; then
-  cat <<EOF2 >> /etc/network/interfaces
+  cat <<EOF2 >> /etc/network/interfaces.TO_BE_INSTALLED
 
 allow-hotplug wlan0
 iface wlan0 inet dhcp
@@ -397,6 +399,15 @@ iface wlan0 inet dhcp
     wpa-psk ${WLAN_PASSWORD}
 EOF2
 fi
+
+# Setup script that runs on first boot, copies over new network config,
+# and deletes itself afterwards
+cat <<EOF2 > /etc/rc2.d/S00fix_network
+#!/bin/bash
+mv /etc/network/interfaces.TO_BE_INSTALLED /etc/network/interfaces
+rm /etc/rc2.d/S00fix_network
+EOF2
+chmod a+x /etc/rc2.d/S00fix_network
 
 # Make sure arcade's files belong to himself
 chown -R ${USER}:${USER} /home/${USER}
