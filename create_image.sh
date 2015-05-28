@@ -411,6 +411,7 @@ chmod a+x /etc/rc2.d/S00fix_network
 
 # Make sure arcade's files belong to himself
 chown -R ${USER}:${USER} /home/${USER}
+chown -R ${USER}:${USER} /mame-data
 
 # Clean up
 apt-get -qq -y autoremove
