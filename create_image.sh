@@ -351,6 +351,8 @@ preseed apt-setup/universe boolean true
 @core
 ubuntu-desktop
 openssh-server
+# unity-lens-applications is a recommendation that we actually want
+unity-lens-applications
 # for mame <= 0.152
 libsdl-image1.2
 libsdl-mixer1.2
