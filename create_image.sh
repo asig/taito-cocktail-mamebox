@@ -35,13 +35,14 @@ function log() {
 }
 
 function usage() {
-	echo "Usage: $0 [--rotation=0|90|180|270] [--wlan_ssid=<ssid> --wlan_password=<password>] [--hostname=<hostname>] [--mame=<path/to/mame>] --frontend-pack=<path/to/frontendpack.tar.bz2>" >&2
+	echo "Usage: $0 [--rotation=0|90|180|270] [--wlan_ssid=<ssid> --wlan_password=<password>] [--hostname=<hostname>] [--mame=<path/to/mame>] --frontend-pack=<path/to/frontendpack.tar.bz2> [--data-pack=<path/to/data-pack.tar.bz2>]" >&2
 	exit 1
 }
 
 function parse_command_line() {
   ROTATION=0
   FRONTEND_PACK=
+  DATA_PACK=
   HOSTNAME=nohost
   WLAN_SSID=
   WLAN_PASSWORD=
@@ -55,6 +56,10 @@ function parse_command_line() {
         ;;
       --frontend-pack=*)
         FRONTEND_PACK="${i#*=}"
+        shift
+        ;;
+      --data-pack=*)
+        DATA_PACK="${i#*=}"
         shift
         ;;
       --hostname=*)
@@ -88,6 +93,11 @@ function parse_command_line() {
     fi
     if [ ! -f ${FRONTEND_PACK} ]; then
       log "${FRONTEND_PACK} is not a valid file"
+      usage
+    fi
+
+    if [ ! -z ${DATA_PACK} -a ! -f ${DATA_PACK} ]; then
+      log "${DATA_PACK} is not a valid file"
       usage
     fi
 
@@ -215,8 +225,16 @@ EOF
 
 # Frontend pack and mame
 mkdir -p ${STAGING_DIR}/home/${USER}/mamego
-tar xfj ${BINARY_DIR}/${FRONTEND_PACK} -C ${STAGING_DIR}/home/${USER}/mamego
+log "Unpacking frontend pack..."
+tar xf ${BINARY_DIR}/${FRONTEND_PACK} -C ${STAGING_DIR}/home/${USER}/mamego
+
+if [ -f ${BINARY_DIR}/${DATA_PACK} ]; then
+  log "Unpacking data pack..."
+  tar xf ${BINARY_DIR}/${DATA_PACK} -C ${STAGING_DIR}
+fi
+
 if [ ! -z "${MAME}" ]; then
+  log "Copying mame..."
   cp ${MAME} ${STAGING_DIR}/home/${USER}/mamego
 fi
 
@@ -296,8 +314,7 @@ clearpart --all --initlabel
 # Disk partitioning information
 # This assumes at least a 30G disk and will fail
 # if the disk is too small.
-part / --fstype ext4 --size 4096 --asprimary 
-part /mame-data --fstype ext4 --size 20480 --asprimary 
+part / --fstype ext4 --size 24576 --asprimary 
 part swap --size 3192 --grow --maxsize 4096 --asprimary 
 
 # Additional partman config
