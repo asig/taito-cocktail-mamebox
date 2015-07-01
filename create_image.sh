@@ -35,12 +35,12 @@ function log() {
 }
 
 function usage() {
-	echo "Usage: $0 [--orientation=horizontal|vertical] [--wlan_ssid=<ssid> --wlan_password=<password>] [--hostname=<hostname>] [--mame=<path/to/mame>] --frontend-pack=<path/to/frontendpack.tar.bz2>" >&2
+	echo "Usage: $0 [--rotation=0|90|180|270] [--wlan_ssid=<ssid> --wlan_password=<password>] [--hostname=<hostname>] [--mame=<path/to/mame>] --frontend-pack=<path/to/frontendpack.tar.bz2>" >&2
 	exit 1
 }
 
 function parse_command_line() {
-  ORIENTATION=vertical
+  ROTATION=0
   FRONTEND_PACK=
   HOSTNAME=nohost
   WLAN_SSID=
@@ -49,8 +49,8 @@ function parse_command_line() {
 
   for i in "$@"; do
     case $i in
-      --orientation=*)
-        ORIENTATION="${i#*=}"
+      --rotation=*)
+        ROTATION="${i#*=}"
         shift
         ;;
       --frontend-pack=*)
@@ -79,7 +79,7 @@ function parse_command_line() {
 		esac
 	done
 
-    if [[ "${ORIENTATION}" != "horizontal" && "${ORIENTATION}" != "vertical" ]]; then
+    if [[ "${ROTATION}" != "0" && "${ROTATION}" != "90" && "${ROTATION}" != "180" && "${ROTATION}" != "270" ]]; then
     	usage
     fi
 
@@ -150,14 +150,8 @@ log "Setting up staging directory..."
 mkdir -p ${STAGING_DIR}
 # Plymouth
 mkdir -p ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo
-cp ${BINARY_DIR}/resources/plymouth/mamebox-logo/* ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo
-if [[ "${ORIENTATION}" == "horizontal" ]]; then
-	mv ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-horizontal.png ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo.png
-	rm ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-vertical.png
-else
-	rm ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-horizontal.png
-	mv ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo-vertical.png ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo.png
-fi
+cp ${BINARY_DIR}/resources/plymouth/mamebox-logo/mamebox-logo* ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/
+cp ${BINARY_DIR}/resources/plymouth/mamebox-logo/logo-${ROTATION}.png ${STAGING_DIR}/lib/plymouth/themes/mamebox-logo/logo.png
 
 # Creating mamego Desktop Session
 mkdir -p ${STAGING_DIR}/usr/share/xsessions
@@ -192,7 +186,7 @@ cat <<EOF > ${STAGING_DIR}/etc/modprobe.d/blacklist-mei.conf
 blacklist mei_me
 EOF
 
-# Configure GRUB to not wait for OS selection, and add the "quiet" and "splash" command line args
+# Configure GRUB to not wait for OS selection, and add the "quiet" and "splash" command line args, and set the resolution to 800x600
 mkdir -p ${STAGING_DIR}/etc/default
 cat <<EOF > ${STAGING_DIR}/etc/default/grub
 GRUB_DEFAULT=0
@@ -200,8 +194,9 @@ GRUB_HIDDEN_TIMEOUT=0
 GRUB_HIDDEN_TIMEOUT_QUIET=true
 GRUB_TIMEOUT=0
 GRUB_DISTRIBUTOR=`lsb_release -i -s 2> /dev/null || echo Debian`
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash vga=0x315"
 GRUB_CMDLINE_LINUX=""
+GRUB_GFXMODE=800x600
 EOF
 
 # User settings
@@ -218,6 +213,12 @@ ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAEAQDa1broGfjiZBAOU3pFsyEbCn1//S5axUc8a0veQPX3
 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAEAQDKrRBlNVyjCaUQwaDvZYgNkFPxgrt4YSsGcr95OGarAB9wd5VfE2lqtcYdCbZQDVyKiihlQrTvQVh9zOau8r3+guTf+TDzMEFS0D+npnxrROI1MdUloOUuroAvSwlMXqmrjhmuO4y/uc6U0LB6/sw4LtTiSbUfknwW875RkoomBTj9WTQRR5XgoboYGIBbsqNgVNFXNaQNq0lTxBRwaIGg/TikAkutz0npifLqXoSM0s6AW+TSyFsIXKV74KkT65cCfirNeIKDX58GmqLAoCelAn2WdHVHjkucLgQ+KtxtyADvnOESIDWLMIugRLNkBMUlhRymkzTDSZGklZhRz9PhgDAFvtKm8rIweaC9E08S4ZXQ4KF5wdI1OC8T//ksD6ZUWW1yPc1jISJ8xrdgo54SVXzYNrM+47sipm7dZ2JyJE+2hpp2iQQD2rxTCFDi984cuDPNT/XAN47pUA2eZAX5GixrumRABIaBdd+NdRymOz8ZheJje5IoIxynR4uxZBRHlpkrXoG5RoCUSWgdi2OmRfOCEskOK0ZE958d5hTX+IxsNc9IwQLOYnCFOtOMpVyr/xwiAsd4GE909fBe2w8E0JZBeF3opBDknbBxphpcNOh0lkPAOmftnm99YWhFGWs4af7DMOFr3Kj+06e9Q8S3JotGyc2aJ/VTo6gFCf5PSB4xOYeneAx9b7jgVXZZpifRISQqFcS188wugT4llqwemKQ/2LImJg6E5nuHAwWZCG0rSVRUJ4uFUXck6ol9Wogv12hcU3YWra5Z+GnjFPWO7iqiw6vmpK5skJm+kbPdqh64F5yx9p+hu4MkKDFnQ6y9OF5nYnSB2/LpLNLbn5Ro5I4SxLXaxN72afUJxmobC6SN9Y0SXnH3+MIO4TacUKqZj72r0+4eHfQPuKHU11fI7uxp52zhX0ku01jYT++cHgodCyuxiYJp07YV2DmeuroUQTJwpUs2dCF7ud2QhpeT4cfXBQOzfKbLbD34sKENnf6KXoO8Q2Sia7mnCDq2K0hwJJqmjmigj+QxvkFptWJ1G0uF5npmn5yZzgyLfJcgd5pxO14Sqlwra0TgR4lWJSgrnaPcQi4Ypuzke+vTNB0uSpMHOIVK2sx9wu6HVufkUpJj7EMcUX0+fV0kzL6bv/3xyPdIW4Ux+GpEo1yQsHx6qJRjpjcwRKkz/Fs6xGj1CSsV5ZO5TC0qHRYFaR+PBOj2COYCIsYSWOpQ5/4MX6Tt/2+uMWykzARb+L/uNHdrg692CJ/WN1vYFa18xrLSeSyOcMeiRJDZEAMooedEYLg9rWBE/uzHjEKBshv0nwyU0c+2BxITXp8UvmYCquHCIbrpXqq7YAQqw3c7/f/eKiGR asigner@ubuntu-vm
 EOF
 
+# Frontend pack and mame
+mkdir -p ${STAGING_DIR}/home/${USER}/mamego
+tar xfj ${BINARY_DIR}/${FRONTEND_PACK} -C ${STAGING_DIR}/home/${USER}/mamego
+if [ ! -z "${MAME}" ]; then
+  cp ${MAME} ${STAGING_DIR}/home/${USER}/mamego
+fi
 
 # ------------------------------------------------------------------------
 
@@ -226,12 +227,9 @@ EOF
 #
 log "Setting up install scripts..."
 
+# Pack staging directory to data.tar.bz2
 mkdir -p ${ISO_DIR}/mamebox
 tar cfj ${ISO_DIR}/mamebox/data.tar.bz2 -C ${STAGING_DIR} .
-cp ${BINARY_DIR}/${FRONTEND_PACK} ${ISO_DIR}/mamebox/frontend.tar.bz2
-if [ ! -z "${MAME}" ]; then
-  cp ${MAME} ${ISO_DIR}/mamebox/
-fi
 
 echo en > ${ISO_DIR}/isolinux/lang  # Prevent the language selection menu from appearing
 
@@ -365,11 +363,6 @@ libsdl2-ttf-2.0.0
 # copy additional config and frontend
 cd /
 tar xfj /media/cdrom/mamebox/data.tar.bz2
-mkdir -p /home/${USER}/mamego
-tar xfj /media/cdrom/mamebox/frontend.tar.bz2 -C /home/${USER}/mamego
-if [ -f /media/cdrom/mamebox/mame ]; then
-  cp /media/cdrom/mamebox/mame /home/${USER}/mamego/
-fi
 
 # Update grub because we (might have) messed with its config
 /usr/sbin/update-grub
