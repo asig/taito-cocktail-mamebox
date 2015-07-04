@@ -180,7 +180,15 @@ cat <<EOF > ${STAGING_DIR}/etc/lightdm/lightdm.conf
 autologin-user=${USER}
 autologin-session=lightdm-autologin # This seems to be important, but I couldn't find documentation...
 user-session=arcade
+display-setup-script=/home/${USER}/screen-init.sh # It seems that some systems forget that we need 800x600, so we add our own script to ensure this.
 EOF
+
+# Display setup script
+mkdir -p ${STAGING_DIR}/home/${USER}
+cat <<EOF > ${STAGING_DIR}/home/${USER}/screen-init.sh
+xrandr --output VGA1 --mode 800x600 2> /var/log/screen-init.ERR
+EOF
+chmod a+rx ${STAGING_DIR}/home/${USER}/screen-init.sh
 
 # VERSION file 
 mkdir -p ${STAGING_DIR}/home/${USER}
