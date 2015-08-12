@@ -84,30 +84,29 @@ function parse_command_line() {
 		esac
 	done
 
-    if [[ "${ROTATION}" != "0" && "${ROTATION}" != "90" && "${ROTATION}" != "180" && "${ROTATION}" != "270" ]]; then
-    	usage
-    fi
+  if [[ "${ROTATION}" != "0" && "${ROTATION}" != "90" && "${ROTATION}" != "180" && "${ROTATION}" != "270" ]]; then
+    usage
+  fi
 
-    if [ -z "${FRONTEND_PACK}" ]; then
-    	usage
-    fi
-    if [ ! -f ${FRONTEND_PACK} ]; then
-      log "${FRONTEND_PACK} is not a valid file"
+  if [ -z "${FRONTEND_PACK}" ]; then
+  	usage
+  fi
+  if [ ! -f ${FRONTEND_PACK} ]; then
+    log "${FRONTEND_PACK} is not a valid file"
+    usage
+  fi
+
+  if [ ! -z ${DATA_PACK} -a ! -f ${DATA_PACK} ]; then
+    log "${DATA_PACK} is not a valid file"
+    usage
+  fi
+
+  if [ ! -z "${MAME}" ]; then
+    if [ ! -f ${MAME} ]; then
+      log "${MAME} is not a valid file"
       usage
     fi
-
-    if [ ! -z ${DATA_PACK} -a ! -f ${DATA_PACK} ]; then
-      log "${DATA_PACK} is not a valid file"
-      usage
-    fi
-
-    if [ ! -z "${MAME}" ]; then
-      if [ ! -f ${MAME} ]; then
-        log "${MAME} is not a valid file"
-        usage
-      fi
-    fi
-
+  fi
 }
 
 
@@ -212,7 +211,7 @@ GRUB_HIDDEN_TIMEOUT=0
 GRUB_HIDDEN_TIMEOUT_QUIET=true
 GRUB_TIMEOUT=0
 GRUB_DISTRIBUTOR=`lsb_release -i -s 2> /dev/null || echo Debian`
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash vga=0x315"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash vga=789 nomodeset"
 GRUB_CMDLINE_LINUX=""
 GRUB_GFXMODE=800x600
 EOF
