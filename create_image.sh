@@ -96,7 +96,7 @@ function parse_command_line() {
     usage
   fi
 
-  if [ ! -z ${DATA_PACK} -a ! -f ${DATA_PACK} ]; then
+  if [ ! -z "${DATA_PACK}" -a ! -f "${DATA_PACK}" ]; then
     log "${DATA_PACK} is not a valid file"
     usage
   fi
